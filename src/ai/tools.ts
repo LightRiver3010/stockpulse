@@ -11,7 +11,9 @@ import { jsonSchema, tool } from 'ai'
 import type { ToolSet } from 'ai'
 import { z } from 'zod/v4'
 import { BUILT_IN_TOOLS, applyAiToolDefaults } from 'deepspace/worker'
-import type { ToolSchema, CollectionSchema } from 'deepspace/worker'
+import type { ToolSchema, CollectionSchema, AgentToolContext } from 'deepspace/worker'
+import Exa from 'exa-js'
+import type { Env } from '../../worker.js'
 
 type ToolExecutor = (toolName: string, params: Record<string, unknown>) => Promise<unknown>
 
@@ -65,6 +67,8 @@ export function buildSystemPrompt(appName: string, schemas: CollectionSchema[]):
     '- After a successful write, briefly confirm what changed.',
     '- If a write is denied (RBAC), tell the user plainly — do not retry blindly.',
     '',
+    "Call web_search before answering unless you're certain the answer can't have changed since your training cutoff.",
+    '',
     'Use tools to look up facts before answering. Do not invent data.',
     'If data is missing, say so plainly. Keep answers concise.',
     '',
@@ -77,7 +81,10 @@ export function buildSystemPrompt(appName: string, schemas: CollectionSchema[]):
 // Tool definitions
 // ============================================================================
 
-export function buildTools(executor: ToolExecutor): ToolSet {
+export function buildTools(
+  executor: ToolExecutor,
+  context?: AgentToolContext<Env>,
+): ToolSet {
   const tools: ToolSet = {}
 
   for (const def of BUILT_IN_TOOLS) {
@@ -93,6 +100,50 @@ export function buildTools(executor: ToolExecutor): ToolSet {
         executor(def.name, applyAiToolDefaults(def.name, params)),
     })
   }
+
+  tools.web_search = tool({
+    description:
+      'Search the live web and return the most relevant URLs and content. Use for fresh information beyond the model\'s training data.',
+    inputSchema: jsonSchema<{ query: string; objective: string }>(
+      z.toJSONSchema(
+        z.object({
+          query: z.string().describe('Search query'),
+          objective: z
+            .string()
+            .describe(
+              'Goal for this search turn; say which documents should rank first, which should be excluded, and what specific facts or figures to pull from them.',
+            ),
+        }),
+      ) as Parameters<typeof jsonSchema>[0],
+      {
+        validate: async (value) => {
+          const schema = z.object({
+            query: z.string(),
+            objective: z.string(),
+          })
+          const res = await schema.safeParseAsync(value)
+          return res.success
+            ? { success: true, value: res.data }
+            : { success: false, error: res.error }
+        },
+      },
+    ),
+    execute: async ({ query, objective }: { query: string; objective: string }) => {
+      const apiKey =
+        context?.env?.EXA_API_KEY ||
+        (typeof process !== 'undefined' ? process.env?.EXA_API_KEY : undefined)
+      if (!apiKey) {
+        throw new Error('EXA_API_KEY is not configured')
+      }
+      const exa = new Exa(apiKey)
+      const result = await exa.search(query, {
+        objective,
+        type: 'auto',
+        contents: { highlights: true },
+      })
+      return result
+    },
+  })
 
   return tools
 }

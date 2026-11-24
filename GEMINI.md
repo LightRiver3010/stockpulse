@@ -3,6 +3,14 @@
 ## What This Is
 StockPulse is a personal stock news summarizer built entirely on DeepSpace (deep.space). A cron-triggered backend pipeline searches for recent articles about watched stocks, summarizes them with an LLM, and displays structured results on a React dashboard. Deployed to `stockpulse.app.space`.
 
+## Agent Workflow Rules
+- **Pre-Modification Approval Required**: Before creating, editing, or deleting any files in the codebase, the agent must provide a brief 2-3 sentence explanation in plain terms stating:
+  1. What actions are being taken.
+  2. Which specific files will be added or modified.
+  3. How this impacts the project overall.
+  The agent must pause and receive explicit user approval before executing file writes or modifications.
+- **README Ownership**: Do not generate, edit, or overwrite `README.md` files. The user will manually write and manage all README files for major folders.
+
 ## DeepSpace Products Used
 - **Auth** — Google/GitHub sign-in via AuthGate, platform-minted JWTs
 - **Records** — SQLite-backed collections for watchlist and summaries, real-time sync via useQuery

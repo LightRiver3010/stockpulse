@@ -30,6 +30,8 @@ import {
 } from 'deepspace/worker'
 import type { ExpoAuthBridgeOptions, JwtVerifierConfig, VerifyResult } from 'deepspace/worker'
 import { integrations } from '../integrations.js'
+import Exa from 'exa-js'
+import { runPipeline, summarizeArticles } from './pipeline.js'
 import type { AppContext, Env } from '../../worker.js'
 
 function jwtConfig(env: Env): JwtVerifierConfig {
@@ -76,6 +78,158 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
   // Native routes must precede the Better Auth wildcard below. The exact
   // browser callback handler branches only when the native bridge's validated
   // redirect_uri is present, so a generated worker cannot shadow native OAuth.
+  // Pipeline batch execution endpoint
+  app.all('/api/pipeline/run', async (c) => {
+    try {
+      const forceRefresh = c.req.query('force') === 'true'
+      const tickersParam = c.req.query('tickers')
+      const specificTickers = tickersParam ? tickersParam.split(',').map((t) => t.trim()) : undefined
+
+      const result = await runPipeline(c.env, {
+        forceRefresh,
+        specificTickers,
+      })
+
+      return c.json(result)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: 'Pipeline execution failed', details: message }, 500)
+    }
+  })
+
+  app.get('/api/test-exa', async (c) => {
+    try {
+      const apiKey =
+        c.env.EXA_API_KEY ||
+        (typeof process !== 'undefined' ? process.env?.EXA_API_KEY : undefined)
+      const startDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()
+
+      const ticker = (c.req.query('ticker') || 'AAPL').toUpperCase()
+      const defaultCompany =
+        ticker === 'NVDA'
+          ? 'Nvidia'
+          : ticker === 'SPY' || ticker === 'S&P'
+            ? 'S&P 500'
+            : ticker === 'GOOGL'
+              ? 'Alphabet'
+              : ticker === 'MSFT'
+                ? 'Microsoft'
+                : ticker === 'AMZN'
+                  ? 'Amazon'
+                  : ticker === 'TSLA'
+                    ? 'Tesla'
+                    : ticker === 'META'
+                      ? 'Meta Platforms'
+                      : ticker === 'JPM'
+                        ? 'JPMorgan Chase'
+                        : 'Apple Inc'
+      const companyName = c.req.query('company') || defaultCompany
+      const query = `${companyName} stock news`
+
+      let articlesList: Array<{ title: string; url: string; text?: string; highlights?: string[] }> = []
+
+      if (apiKey) {
+        const exa = new Exa(apiKey)
+        const result = await exa.search(query, {
+          type: 'auto',
+          numResults: 5,
+          startPublishedDate: startDate,
+          contents: {
+            highlights: true,
+          },
+        })
+        articlesList = result.results as typeof articlesList
+      } else {
+        const proxyRes = await apiWorkerFetch(c.env, '/api/integrations/exa/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${c.env.APP_OWNER_JWT}`,
+          },
+          body: JSON.stringify({
+            query,
+            numResults: 5,
+            startPublishedDate: startDate,
+            contents: {
+              highlights: {},
+            },
+          }),
+        })
+        const proxyData = (await proxyRes.json()) as { results?: typeof articlesList }
+        articlesList = proxyData.results ?? []
+      }
+
+      const extractedTexts = articlesList
+        .map((a) => {
+          if (Array.isArray(a.highlights) && a.highlights.length > 0) {
+            return a.highlights.join('\n')
+          }
+          return a.text || a.title
+        })
+        .filter((t) => Boolean(t && t.trim().length > 0))
+
+      const summary = await summarizeArticles(c.env, {
+        ticker,
+        companyName,
+        articles: extractedTexts,
+      })
+
+      // Persist the summary to Records via the AppRecordRoom Durable Object
+      const recordRoomStub = c.env.RECORD_ROOMS.get(
+        c.env.RECORD_ROOMS.idFromName(`app:${c.env.DEEPSPACE_APP_ID}`),
+      )
+
+      const recordRes = await recordRoomStub.fetch(
+        new Request('https://internal/api/tools/execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-User-Id': c.env.OWNER_USER_ID,
+            'X-App-Action': 'true',
+          },
+          body: JSON.stringify({
+            tool: 'records.create',
+            params: {
+              collection: 'summaries',
+              data: {
+                ticker,
+                companyName,
+                summary: summary.summary,
+                sentiment: summary.sentiment,
+                keyTopics: summary.keyTopics.join(', '),
+                sourceUrls: articlesList.map((a) => a.url).join(', '),
+                sourceCount: summary.sourceCount,
+                generatedAt: Date.now(),
+              },
+            },
+          }),
+        }),
+      )
+
+      const recordResult = (await recordRes.json()) as {
+        success: boolean
+        data?: { recordId?: string }
+        error?: string
+      }
+
+      if (!recordResult.success) {
+        console.error('[test-exa] Failed to save summary to Records:', recordResult.error)
+      }
+
+      return c.json({
+        ticker,
+        companyName,
+        sourceArticlesCount: articlesList.length,
+        summary,
+        savedRecordId: recordResult.data?.recordId,
+        articles: articlesList.map((a) => ({ title: a.title, url: a.url })),
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: 'Pipeline test failed', details: message }, 500)
+    }
+  })
+
   app.get('/api/auth/native-start', (c) => nativeAuthStart(c.req.raw, c.env, nativeAuthOptions(c.env)))
   app.post('/api/auth/native-exchange', (c) => nativeAuthExchange(c.req.raw, c.env))
   app.post('/api/auth/native-token', (c) => nativeAuthToken(c.req.raw, c.env))

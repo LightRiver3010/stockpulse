@@ -83,6 +83,7 @@ export class AppJobRoom extends JobRoom<Env> {
 }
 
 export interface Env extends DOBindings<typeof __DO_MANIFEST__> {
+  EXA_API_KEY?: string
   ASSETS: Fetcher
   /**
    * Platform service binding in production; deepspace dev supplies the URL
