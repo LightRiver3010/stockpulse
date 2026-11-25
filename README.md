@@ -13,3 +13,6 @@ I built StockPulse using several of DeepSpace's tools:
 3. Cron - The schedule to run Exa API (used for searching for articles and gathering highlights) is on a weekday cron schedule, running at 5:30 PM to allow time for articles to be published after the stock market closes
 4. User Auth & Roles - Auth for easy login handling and storing user data, and Roles for the default "Guest" login people who haven't created an account can use to see a demo of the product.
 5. DeepSpace CLI - Simple, but obvious. Used to easily run and deploy my app. I was honestly surprised how simple it was to set up and get a live server running. The commands were so simple I didn't need a reference sheet of how to run a specific command or start the app.
+
+## Agent Usage
+As for agents, I used Google's Antigravity with their Hydrogen model. I have very minimal experience with TypeScript and React, so working with the agent meant I could plan the details of how the app needed to be implemented, and it could handle the syntax I was unfamiliar with. I worked at a higher-level, determining what features to implement, how they would be implemented (via what APIs, presentation, etc.), and let the agent handle things like frontend color scheme and syntax.
