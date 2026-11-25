@@ -7,6 +7,7 @@ export const summariesSchema: CollectionSchema = {
     { name: 'companyName', storage: 'text', interpretation: 'plain' },
     { name: 'summary', storage: 'text', interpretation: 'plain' },
     { name: 'sentiment', storage: 'text', interpretation: 'plain' },
+    { name: 'trend', storage: 'text', interpretation: 'plain' },
     { name: 'keyTopics', storage: 'text', interpretation: 'plain' },
     { name: 'sourceUrls', storage: 'text', interpretation: 'plain' },
     { name: 'sourceCount', storage: 'number', interpretation: 'plain' },

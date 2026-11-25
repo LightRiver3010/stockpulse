@@ -11,6 +11,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import {
   apiWorkerFetch,
   authWorkerFetch,
+  buildCronContext,
   BROWSER_PROXY_ROUTES,
   integrationPath,
   isPlatformReservedPath,
@@ -78,12 +79,45 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
   // Native routes must precede the Better Auth wildcard below. The exact
   // browser callback handler branches only when the native bridge's validated
   // redirect_uri is present, so a generated worker cannot shadow native OAuth.
+  // Open metrics endpoint returning registered user count in plain JSON
+  app.get('/api/metrics/users', async (c) => {
+    try {
+      const ctx = buildCronContext(
+        c.env,
+        c.env.OWNER_USER_ID,
+        `app:${c.env.DEEPSPACE_APP_ID}`,
+      )
+      const users = await ctx.records.query('users')
+      return c.json({ count: users.length })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      return c.json({ error: 'Failed to count users', details: message }, 500)
+    }
+  })
+
   // Pipeline batch execution endpoint
+  // - Single non-forced ticker: any signed-in non-anonymous user (on-demand watchlist add)
+  // - Multi-ticker, full run, or force=true: admin only
   app.all('/api/pipeline/run', async (c) => {
     try {
+      const auth = (await resolveAuth(c.req.raw, c.env)) ?? (await resolveSessionReadAuth(c.req.raw, c.env))
+      if (!auth || auth.userId.startsWith('anon-')) {
+        return c.json({ error: 'Authentication required' }, 401)
+      }
+
       const forceRefresh = c.req.query('force') === 'true'
       const tickersParam = c.req.query('tickers')
-      const specificTickers = tickersParam ? tickersParam.split(',').map((t) => t.trim()) : undefined
+      const specificTickers = tickersParam
+        ? tickersParam.split(',').map((t) => t.trim()).filter(Boolean)
+        : undefined
+
+      const isSingleOnDemand = Boolean(specificTickers && specificTickers.length === 1 && !forceRefresh)
+      if (!isSingleOnDemand) {
+        const role = await resolveAppRole(c.env, auth.userId)
+        if (role !== 'admin') {
+          return c.json({ error: 'Admin access required' }, 403)
+        }
+      }
 
       const result = await runPipeline(c.env, {
         forceRefresh,
@@ -99,6 +133,13 @@ export function registerAuthAndIntegrationRoutes(app: Hono<AppContext>): void {
 
   app.get('/api/test-exa', async (c) => {
     try {
+      const auth = (await resolveAuth(c.req.raw, c.env)) ?? (await resolveSessionReadAuth(c.req.raw, c.env))
+      if (!auth || auth.userId.startsWith('anon-')) {
+        return c.json({ error: 'Authentication required' }, 401)
+      }
+      if ((await resolveAppRole(c.env, auth.userId)) !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403)
+      }
       const apiKey =
         c.env.EXA_API_KEY ||
         (typeof process !== 'undefined' ? process.env?.EXA_API_KEY : undefined)

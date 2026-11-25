@@ -69,9 +69,9 @@ export default function Navigation() {
 
   return (
     <>
-      <nav data-testid="app-navigation" className="border-b border-border bg-background">
+      <nav data-testid="app-navigation" className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
-          <Link to="/home" className="text-sm font-semibold text-foreground">
+          <Link to="/home" className="font-display text-sm font-bold tracking-tight text-foreground">
             {APP_NAME}
           </Link>
 

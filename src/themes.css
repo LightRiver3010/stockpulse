@@ -16,6 +16,34 @@
  *   4. Switch to it via `data-theme` on <html> in index.html.
  */
 
+/* Midnight Teal — dark charcoal canvas with punchy teal-green accent */
+[data-theme="midnight-teal"] {
+  color-scheme: dark;
+  --color-background: #0d1117;
+  --color-foreground: #e6edf3;
+  --color-card: #161b22;
+  --color-card-foreground: #e6edf3;
+  --color-popover: #161b22;
+  --color-popover-foreground: #e6edf3;
+  --color-primary: #39d9b9;
+  --color-primary-foreground: #0d1117;
+  --color-secondary: #1c2128;
+  --color-secondary-foreground: #e6edf3;
+  --color-muted: #1c2128;
+  --color-muted-foreground: #b3beca;
+  --color-accent: #21262d;
+  --color-accent-foreground: #e6edf3;
+  --color-destructive: #f85149;
+  --color-destructive-foreground: #ffffff;
+  --color-border: rgba(48, 54, 61, 0.7);
+  --color-input: rgba(48, 54, 61, 0.7);
+  --color-ring: #39d9b9;
+  --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.24);
+  --shadow-card-hover: 0 4px 12px 0 rgba(0, 0, 0, 0.36);
+  --color-shell: #080b10;
+  --color-shell-panel: #161b22;
+}
+
 /* Paper — light example theme; shows the full token contract incl.
  * `color-scheme: light`. Replace or delete it once the app has its own. */
 [data-theme="paper"] {

@@ -14,12 +14,24 @@
  * so it's safe to mount here for every page.
  */
 
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Outlet, useRouteError } from 'react-router-dom'
+import Lenis from 'lenis'
 import { ErrorScreen } from '../components/ErrorScreen'
 import { ToastProvider, TooltipProvider } from '@/components/ui'
 
 export default function App() {
+  useEffect(() => {
+    const lenis = new Lenis({
+      autoRaf: true,
+      smoothWheel: true,
+    })
+
+    return () => {
+      lenis.destroy()
+    }
+  }, [])
+
   return (
     <ToastProvider>
       {/* The single TooltipProvider: owns the hover delay for every Tooltip

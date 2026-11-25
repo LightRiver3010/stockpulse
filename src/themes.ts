@@ -18,6 +18,11 @@
 
 export const THEMES = [
   {
+    id: 'midnight-teal',
+    label: 'Midnight Teal',
+    description: 'Deep charcoal canvas with a punchy teal-green accent.',
+  },
+  {
     id: 'slate',
     label: 'Slate',
     description: 'Neutral dark placeholder default. Replace with your own theme.',

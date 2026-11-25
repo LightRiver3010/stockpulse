@@ -4,11 +4,17 @@
   To switch themes, change `data-theme` to any id defined in src/themes.ts.
   Color values per theme live in src/themes.css.
 -->
-<html lang="en" data-theme="slate">
+<html lang="en" data-theme="midnight-teal">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
     <title>stockpulse</title>
     <!--
       First-paint background, keyed to the data-theme attribute above.
@@ -19,6 +25,7 @@
     -->
     <style>
       html { background-color: #0a0a0a; color-scheme: dark; }
+      html[data-theme="midnight-teal"] { background-color: #0d1117; color-scheme: dark; }
       html[data-theme="paper"] { background-color: #ffffff; color-scheme: light; }
       /* Add one line per theme you create, mirroring its --color-background. */
     </style>
